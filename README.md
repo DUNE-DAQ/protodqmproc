@@ -1,2 +1,0 @@
-# protodqmproc
-DQM Prototyping
