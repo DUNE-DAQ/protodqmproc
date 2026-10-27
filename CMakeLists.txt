@@ -6,7 +6,7 @@ find_package(CLI11 REQUIRED)
 find_package(fmt REQUIRED)
 
 daq_setup_environment()
-find_package(hdf5libs REQUIRED)
+find_package(rawdatafilelibs REQUIRED)
 find_package(trgdataformats REQUIRED)
 find_package(fddetdataformats REQUIRED)
 
@@ -17,7 +17,7 @@ find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
 # See https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-cmake/#daq_add_library
 
-daq_add_library(*.cpp LINK_LIBRARIES CLI11::CLI11 hdf5libs::hdf5libs fddetdataformats::fddetdataformats)
+daq_add_library(*.cpp LINK_LIBRARIES CLI11::CLI11 fmt::fmt rawdatafilelibs::rawdatafilelibs fddetdataformats::fddetdataformats)
 
 ##############################################################################
 

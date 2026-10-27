@@ -16,9 +16,12 @@
 #include <fmt/format.h>
 #include <filesystem>
 
-#include "hdf5libs/HDF5RawDataFile.hpp"
 #include "daqdataformats/Fragment.hpp"
+#include "daqdataformats/RecordID.hpp"
+#include "daqdataformats/SourceID.hpp"
 #include "fddetdataformats/WIBEthFrame.hpp"
+#include "rawdatafilelibs/BackendFactory.hpp"
+#include "rawdatafilelibs/RawDataFileReader.hpp"
 
 using namespace dunedaq;
 
@@ -48,41 +51,39 @@ parse_app(CLI::App& _app, CLIOptions& _opts)
 }
 
 /**
- * @brief Gets the hdf5 file objects
+ * @brief Opens a raw data file (any format with a rawdatafilelibs backend, e.g. HDF5)
  * 
  * @param _filename string with the filename
- * @return std::shared_ptr<hdf5libs::HDF5RawDataFile> pointer to the hdf5 object
+ * @return std::shared_ptr<rawdatafilelibs::RawDataFileReader> pointer to the file reader
  */
-std::shared_ptr<hdf5libs::HDF5RawDataFile>
+std::shared_ptr<rawdatafilelibs::RawDataFileReader>
 get_file(const std::string& _filename)
 {
-  std::shared_ptr<hdf5libs::HDF5RawDataFile> file_hdf5;
-
-  file_hdf5 = std::make_shared<hdf5libs::HDF5RawDataFile>(_filename);
-  if (!file_hdf5->is_trigger_record_type()) {
+  std::shared_ptr<rawdatafilelibs::RawDataFileReader> file_hdf5 = rawdatafilelibs::open_raw_data_file(_filename);
+  if (file_hdf5->get_record_type() != rawdatafilelibs::RecordType::kTriggerRecord) {
     throw std::runtime_error(fmt::format("ERROR: input file '{}' not of type 'TriggerRecord'", _filename));
   }
 
-  std::string application_name = file_hdf5->get_attribute<std::string>("application_name");
+  std::string application_name = file_hdf5->get_metadata().application_name;
   std::cout << "File '" << _filename << "' has application name: " << application_name << std::endl;
 
   return file_hdf5;
 }
 
 std::pair<uint64_t, uint64_t>
-get_available_slice_id_range(const std::shared_ptr<hdf5libs::HDF5RawDataFile>& _file)
+get_available_slice_id_range(const std::shared_ptr<rawdatafilelibs::RawDataFileReader>& _file)
 {
   if (!_file) {
     throw std::runtime_error("No valid HDF5 object provided");
   }
 
   // Find min/max record id for this application
-  auto record_ids = _file->get_all_record_ids();
+  auto const& record_ids = _file->get_record_ids();
   if (record_ids.empty()) {
     throw std::runtime_error("HDF5 object contains no records.");
   }
-  uint64_t start = record_ids.begin()->first;
-  uint64_t end = record_ids.rbegin()->first;
+  uint64_t start = record_ids.begin()->number;
+  uint64_t end = record_ids.rbegin()->number;
 
   std::cout << "RecordID range: [" << start << "," << end << "]" << std::endl;
 
@@ -90,11 +91,12 @@ get_available_slice_id_range(const std::shared_ptr<hdf5libs::HDF5RawDataFile>& _
 }
 
 uint64_t
-get_wibeth_count(const std::shared_ptr<hdf5libs::HDF5RawDataFile>& _file_hdf5,
-                 const std::string& _frag_dataset)
+get_wibeth_count(const std::shared_ptr<rawdatafilelibs::RawDataFileReader>& _file_hdf5,
+                 const daqdataformats::RecordID& _record_id,
+                 const daqdataformats::SourceID& _source_id)
 {
   // Get the fragment and print its type
-  std::unique_ptr<daqdataformats::Fragment> frag_ptr = _file_hdf5->get_frag_ptr(_frag_dataset);
+  std::unique_ptr<daqdataformats::Fragment> frag_ptr = _file_hdf5->get_fragment(_record_id, _source_id);
   dunedaq::daqdataformats::FragmentType frag_type = frag_ptr->get_fragment_type();
   std::cout << "Fragment type: " << daqdataformats::fragment_type_to_string(frag_type) << std::endl;
 
@@ -128,7 +130,7 @@ main(int argc, const char* argv[])
   std::cout << "Processing file:" << opts.input_file << "\n";
 
   // Gets the file
-  std::shared_ptr<hdf5libs::HDF5RawDataFile> file_hdf5 = 
+  std::shared_ptr<rawdatafilelibs::RawDataFileReader> file_hdf5 = 
     get_file(opts.input_file);
 
   // Get the available record_id range
@@ -138,11 +140,13 @@ main(int argc, const char* argv[])
   uint64_t num_wibeth_frames_count = 0;
   uint64_t num_wibeth_count = 0;
 
-  for (const std::string& frag_dataset : file_hdf5->get_fragment_dataset_paths(recordid_to_process)) {
-    std::cout << "Fragment dataset path: " << frag_dataset << "\n";
+  // As before, the record with that number and sequence number 0
+  const daqdataformats::RecordID record_id(recordid_to_process, 0);
+  for (const daqdataformats::SourceID& source_id : file_hdf5->get_fragment_source_ids(record_id)) {
+    std::cout << "Fragment SourceID: " << source_id.to_string() << "\n";
 
     // I love this new C++ feature
-    if (uint64_t num_wibs = get_wibeth_count(file_hdf5, frag_dataset)){
+    if (uint64_t num_wibs = get_wibeth_count(file_hdf5, record_id, source_id)){
       num_wibeth_count += num_wibs;
       num_wibeth_frames_count++;
     }
