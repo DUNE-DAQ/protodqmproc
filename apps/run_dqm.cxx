@@ -15,6 +15,8 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include <filesystem>
+#include <memory>
+#include <string>
 
 #include "daqdataformats/Fragment.hpp"
 #include "daqdataformats/RecordID.hpp"
@@ -52,7 +54,7 @@ parse_app(CLI::App& _app, CLIOptions& _opts)
 
 /**
  * @brief Opens a raw data file (any format with a rawdatafilelibs backend, e.g. HDF5)
- * 
+ *
  * @param _filename string with the filename
  * @return std::shared_ptr<rawdatafilelibs::RawDataFileReader> pointer to the file reader
  */
@@ -130,8 +132,7 @@ main(int argc, const char* argv[])
   std::cout << "Processing file:" << opts.input_file << "\n";
 
   // Gets the file
-  std::shared_ptr<rawdatafilelibs::RawDataFileReader> file_hdf5 = 
-    get_file(opts.input_file);
+  std::shared_ptr<rawdatafilelibs::RawDataFileReader> file_hdf5 = get_file(opts.input_file);
 
   // Get the available record_id range
   std::pair<uint64_t, uint64_t> recordid_range = get_available_slice_id_range(file_hdf5);
@@ -140,13 +141,13 @@ main(int argc, const char* argv[])
   uint64_t num_wibeth_frames_count = 0;
   uint64_t num_wibeth_count = 0;
 
-  // As before, the record with that number and sequence number 0
+  // Sequence number 0, as this tool has always assumed
   const daqdataformats::RecordID record_id(recordid_to_process, 0);
   for (const daqdataformats::SourceID& source_id : file_hdf5->get_fragment_source_ids(record_id)) {
     std::cout << "Fragment SourceID: " << source_id.to_string() << "\n";
 
     // I love this new C++ feature
-    if (uint64_t num_wibs = get_wibeth_count(file_hdf5, record_id, source_id)){
+    if (uint64_t num_wibs = get_wibeth_count(file_hdf5, record_id, source_id)) {
       num_wibeth_count += num_wibs;
       num_wibeth_frames_count++;
     }
