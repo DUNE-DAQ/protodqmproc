@@ -1,6 +1,4 @@
-----
 ## Processing subsystem scope
----
 The scope of the processing subsystem is to produce DQM metrics and send them to the store. It does not compare them against any thresholds (Analysis subsystem), and does not create any alerts on pre-set logic (Alerts subsystem).
  
 As such, it has to be able to open the data file (which could contain TriggerRecords or TimeSlices), recognise various data types (E.g. WIBethFrames, TriggerPrimitives), and be able to run various DQM algorithms on that data.
@@ -9,9 +7,7 @@ DQM Processing will be one of the heaver processes done by the DQM, and will nee
 
 ![image](figures/dqm_architecture.drawio.png)
 
-----
 ## IO
----
 ### Input sources
 * User-provided .hdf5 file (initial)
 * .hdf5 file discovered from drive (later)
@@ -39,21 +35,14 @@ DQM Processing will be one of the heaver processes done by the DQM, and will nee
   - Can be optimized, e.g. binning can be represented by 3(2) numbers if uniform.
   - Can be optimized, e.g. binning extracted from configuration, no need for each metric sent.
 
----
+
 ## Interactions
----
 ### Triggered Data -> Processing
-
 ### Configuration -> Processing
-
 ### Processing -> Run Registry
-
 ### Processing <-> Store
 
-
----
 ## Processing types
----
 1. DQM-trigger processed at regular intervals.
 	- Some metrics could be processed at different intervals, e.g. FFT/channel less frequently than RMS/channel.
     - Frequent, should be fast and therefore simple.
@@ -73,9 +62,7 @@ DQM Processing will be one of the heaver processes done by the DQM, and will nee
     - Very infrequent, could be slower/more processing involved.
     - **Need to think about online DQM / offline DQM boundary here too.**
 
----
 ## Parallelisation
----
 Spatial and algorithmic level of parallelisation depends on the metrics needed to be calculated. It is likely that data from a single trigger will be distributed on multiple servers for DQM processing, and "which data chunk goes to which server-worker" might depend on the level of spatial cross-correlation needed (e.g. making metrics looking at correlations between two APAs requires single core to access data from both APAs).
 ### Spatial parallelisation
 Each raw fragment contains data from one WIB (512 channels), AMC (64 channels) or DAPHNE, with fragments across whole readout window. TPs are bundled on per-{APA,CRP}plane level, TAs on per-APA/CRP level.
@@ -114,9 +101,7 @@ In principle each algorithm could be executed in parallel, adding another level 
 - Using pointers to the data instead will cause L3 cache misses, slowing the algorithms down.
 - Non-parallelised trigger-like option: Iterate over frame's ticks. For each tick, execute each algorithm sequentially. "Frame/Algorithm start" and "Frame/Algorithm end" might need to be sent to each algorithm for this to work. Fewer cache misses, but no parallelisation. Unclear if works for FFTs.
 
-----
 ## Configuration
-----
 Detailed configuration of algorithms could be a separate document / section. Not only which algorithm to run, but e.g. algorithm-specific config (e.g. frequency granularity for FFT) and even spatial (e.g. RMS for entire WIB vs channel-by-channel).
 
 ### Components to configure
@@ -147,9 +132,7 @@ Detailed configuration of algorithms could be a separate document / section. Not
 	- Alternatively: Store everything online & offline (default?), but have flags for do not use in analysis / alerts.
 		- That way users can always access custom runs offline if needed, processed data never lost.
 
----
 ## Orchestration
----
 ### Data distribution across Processing
 - Data from .hdf5 files will come from the entire detector. ~few GB worth of raw TPC/PDS data, complex trigger objects etc.
 - Some DQM component should be able to read this file, split it into chunks, and send for processing.
@@ -173,9 +156,7 @@ Detailed configuration of algorithms could be a separate document / section. Not
 	- E.g. a task is a subdetector - datatype(s) - Algorithm(s) combination.
 	- Memory locality: send the data to thread once, process multiple times (algorithms). May be difficult for data where multiple types needed (e.g. raw data + TAs)
 
-----
 ## Design / Shape
-----
 ![image](figures/dqm_processing_design.drawio.png)
 
 DQM processing will need to perform three major operations:
@@ -185,40 +166,41 @@ DQM processing will need to perform three major operations:
 
 ### Data Reader
 
-Receive:
+#### Receive
 - Data to process, whether in HDF5 format (user-provided or from some automatic task), or in TriggerRecord/TimeSlice (directly from DataFlow).
 - Configuration, detailing the algorithms to run, conditions, channel masks etc. Information can be pulled from some from of run registry to.
 
-Processing:
+#### Processing
 - Check file headers, TR headers, TS headers, fragment headers etc. Effectively simple checks on file/object integrity.
 
-Send:
+#### Send
 - Data/file pointers, and configurations to use with that data.
 - This does not need to be "send over network". Data Reader could be an object within Processing Orchestrator application, _returning_ these pointers/configurations.
 - Operational status to the CCM. E.g. how many data chunks received since last operational message?
 
 ### Processing Orchestrator
-Receive:
+#### Receive
 - TR/TS pointers, with list of data types to process.
 - A list of algorithm & algorithm configurations to run on that data.
 
-Processing:
+#### Processing
 - Checks list of resources that these data should be run on.
 - Create a graph of parallel tasks (lets call it a job) to execute.
 	- Each parallel task is a (data chunk, worker) combination, with a list of algorithms bundled to run on it and any relevant configuration.
 - Check if the resources are available.
 - Puts a job (whole graph) into a queue. Sends tasks from the top job as resources become available. Once tasks in job completed, move on to the next job in the queue.
-Send:
+
+#### Send
 - Tasks (data chunk - worker - algorithms combo) to available Workers.
 - Once job completed, send message to the run registry, notifying which trigger was processed.
 - Operational status to the CCM. E.g. how many data chunks received since last operational message? How many jobs successfully processed? How large is the job queue?
 
 ### Worker
-Receive:
+#### Receive
 - Pings from the orchestrator to see if the worker is currently doing any processing.
 - Bundled (data chunk, algorithms) to run on that worker, with any relevant configuration.
 
-Processing:
+#### Processing
 - Set the "work in progress" flag to true.
 - Get the algorithm configuration objects and create a list of algorithms to run on the data.
 	- Might need time-priority, e.g. simple/fast metrics first, FFT/long metrics last.
@@ -229,22 +211,18 @@ Processing:
 - Publish the computed metrics.
 - Set the "work in progress" flag to false.
 
-Send:
+#### Send
 - Responses to the orchestrator saying if the worker is free or not.
 - Data to the temporary store (e.g. expanded frames, TPs, etc).
 - Computed DQM metrics into the DQM store (e.g. by publishing).
 
----
 ## Physics Rates
----
 - Trigger rates are going to be stochastic, and dependent on various factors including level of ROI, disk space, max disk writing rates, physics performance of the algorithms, etc.
 - Given the table below from Josh Klein (TDR? Trigger requirements doc?), it suggests we might have **~0.5GBps throughput of physics triggers**.
 
 ![image](figures/trigger_rates.png)
 
----
 ## Open Questions
----
 - Level of correlation between channels/WIBs/APAs: drives maximum level of parallelization possible.
 	- From TDE: no correlated metrics needed. Noise evaluated "by eye" with correct display views.
 	- From BDE: cross-correlated metrics between channels within FEMB, WIB, WIEC, crate etc. CRP to CRP correlations interesting too.
@@ -252,9 +230,7 @@ Send:
 	- Perhaps higher than DQM display?
 - Granularity of the data (APA/trigger, detector/trigger): drives maximum level of parallelization and level of correlation possible.
 
-----
-## TODO:
-----
+## TODO
 #### Interactions
 * Sampling/data input
 * Telling Run Registry we processed the data
