@@ -1,38 +1,4 @@
 ----
-## Table of contents
-----
-- [[#Processing subsystem scope]]
-- [[#IO]]
-	  - [[#Input sources]]
-	  - [[#Input data types]]
-	  - [[#Output data types]]
-- [[#Interactions]]
-	  - [[#Triggered Data -> Processing]]
-	  - [[#Configuration -> Processing]]
-	  - [[#Processing -> Run Registry]]
-	  - [[#Processing -> Store]]
-- [[#Processing types]]
-- [[#Parallelisation]]
-	  - [[#Spatial parallelisation]]
-	  - [[#Algorithmic parallelisation]]
-- [[#Configuration]]
-	  - [[#Components to configure]]
-	  - [[#Configuration streams]]
-- [[#Orchestration]]
-	  - [[#Data distribution across Processing]]
-	  - [[#Resource-aware orchestration]]
-- [[#Design / Shape]]
-	- [[#Data Reader]]
-	- [[#Processing Orchestrator]]
-	- [[#Worker]]
-- [[#Physics Rates]]
-- [[#Open Questions]]
-- [[#TODO:]]
-	  - [[#TODO:#Interactions|Interactions]]
-	  - [[#Design / Internal shape]]
-	  - [[#Decisions to make]]
-
-----
 ## Processing subsystem scope
 ---
 The scope of the processing subsystem is to produce DQM metrics and send them to the store. It does not compare them against any thresholds (Analysis subsystem), and does not create any alerts on pre-set logic (Alerts subsystem).
@@ -41,7 +7,7 @@ As such, it has to be able to open the data file (which could contain TriggerRec
 
 DQM Processing will be one of the heaver processes done by the DQM, and will need to be parallelized amongst multiple CPU cores, and distributed among multiple servers.
 
-![[figures/dqm_architecture.drawio.png]]
+![image](figures/dqm_architecture.drawio.png)
 
 ----
 ## IO
@@ -210,7 +176,7 @@ Detailed configuration of algorithms could be a separate document / section. Not
 ----
 ## Design / Shape
 ----
-![[figures/dqm_processing_design.drawio.png]]
+![image](figures/dqm_processing_design.drawio.png)
 
 DQM processing will need to perform three major operations:
 1. Read the data, understanding what it is, and doing checks on the file/object headers.
@@ -274,7 +240,7 @@ Send:
 - Trigger rates are going to be stochastic, and dependent on various factors including level of ROI, disk space, max disk writing rates, physics performance of the algorithms, etc.
 - Given the table below from Josh Klein (TDR? Trigger requirements doc?), it suggests we might have **~0.5GBps throughput of physics triggers**.
 
-!Wednesday [[figures/trigger_rates.png]]
+![image](figures/trigger_rates.png)
 
 ---
 ## Open Questions
